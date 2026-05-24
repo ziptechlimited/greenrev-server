@@ -2,12 +2,12 @@ import bcrypt from "bcryptjs";
 import { env } from "../config/env";
 
 const strongPasswordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/;
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
 export function assertStrongPassword(password: string): void {
   if (!strongPasswordRegex.test(password)) {
     throw new Error(
-      "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol",
+      "Password must be at least 8 characters and include uppercase, lowercase, number, and symbol",
     );
   }
 }

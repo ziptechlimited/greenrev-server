@@ -20,7 +20,7 @@ function toInt(value: string | undefined, fallback: number): number {
 
 export const env = {
   nodeEnv: optional("NODE_ENV") ?? "development",
-  port: toInt(optional("PORT"), 5050),
+  port: toInt(optional("PORT"), 4000),
   mongoUri: required("MONGO_URI"),
   frontendUrl: required("FRONTEND_URL"),
   accessTokenSecret: required("JWT_ACCESS_SECRET"),
@@ -34,7 +34,7 @@ export const env = {
   googleClientSecret: optional("GOOGLE_CLIENT_SECRET"),
   googleRedirectUri: optional("GOOGLE_REDIRECT_URI"),
   smtpHost: optional("SMTP_HOST"),
-  smtpPort: toInt(optional("SMTP_PORT"), 587),
+  smtpPort: toInt(optional("SMTP_PORT"), 465),
   smtpUser: optional("SMTP_USER"),
   smtpPass: optional("SMTP_PASS"),
   smtpFrom: optional("SMTP_FROM"),

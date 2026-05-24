@@ -3,17 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const app_1 = require("./app");
 const db_1 = require("./config/db");
+const env_1 = require("./config/env");
 async function main() {
-    const mongoUri = process.env.MONGO_URI;
-    if (!mongoUri) {
-        throw new Error("MONGO_URI is not set");
-    }
-    const port = Number(process.env.PORT ?? 5050);
-    await (0, db_1.connectDB)(mongoUri);
+    await (0, db_1.connectDB)(env_1.env.mongoUri);
     console.log("MongoDB connected");
     const app = (0, app_1.createApp)();
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
+    app.listen(env_1.env.port, () => {
+        console.log(`Server running on port ${env_1.env.port}`);
     });
 }
 main().catch((err) => {

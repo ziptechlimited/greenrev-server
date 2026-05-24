@@ -5,6 +5,9 @@ import cookieParser from "cookie-parser";
 import healthRoutes from "./routes/healthRoutes";
 import authRoutes from "./routes/authRoutes";
 import rbacRoutes from "./routes/rbacRoutes";
+import productRoutes from "./routes/productRoutes";
+import profileRoutes from "./routes/profileRoutes";
+import acquisitionRoutes from "./routes/acquisitionRoutes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { env } from "./config/env";
 import { sanitizeRequest } from "./middleware/sanitize";
@@ -36,6 +39,9 @@ export function createApp() {
   app.use("/api/v1", healthRoutes);
   app.use("/api/v1/auth", authRoutes);
   app.use("/api/v1", rbacRoutes);
+  app.use("/api/v1", productRoutes);
+  app.use("/api/v1", profileRoutes);
+  app.use("/api/v1", acquisitionRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
