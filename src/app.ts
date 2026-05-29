@@ -15,6 +15,7 @@ import { requireHttps } from "./middleware/requireHttps";
 import { requireCsrf } from "./middleware/csrf";
 import expertRoutes from "./routes/expertRoutes";
 import mechanicRoutes from "./routes/mechanicRoutes";
+import bookingRoutes from "./routes/bookingRoutes";
 
 export function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/v1", acquisitionRoutes);
   app.use("/api/v1", expertRoutes);
   app.use("/api/v1", mechanicRoutes);
+  app.use("/api/v1", bookingRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
