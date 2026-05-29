@@ -21,6 +21,7 @@ const userSchema = new Schema(
     lat: { type: Number, required: false, default: null },
     lng: { type: Number, required: false, default: null },
     specialization: { type: [String], required: false, default: [] },
+    hourlyRate: { type: Number, required: false, default: null },
     availability: {
       type: {
         monday:    { available: Boolean, start: String, end: String },
