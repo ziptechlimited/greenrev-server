@@ -4,8 +4,10 @@ import {
   getCustomerRequests,
   getVendorRequests,
   getVendorRequestCount,
-  updateStatus,
-  completeTransaction,
+  vendorAccept,
+  uploadReceipt,
+  vendorConfirmPayment,
+  customerConfirmCompleted,
 } from "../controllers/acquisitionController";
 import { createReview, getVendorReviews } from "../controllers/reviewController";
 import { requireAuth } from "../middleware/auth";
@@ -20,8 +22,10 @@ router.post("/acquisition-requests", limiter, requireAuth, createRequest);
 router.get("/acquisition-requests", limiter, requireAuth, getCustomerRequests);
 router.get("/acquisition-requests/vendor", limiter, requireAuth, getVendorRequests);
 router.get("/acquisition-requests/vendor/count", limiter, requireAuth, getVendorRequestCount);
-router.patch("/acquisition-requests/:id/status", limiter, requireAuth, updateStatus);
-router.patch("/acquisition-requests/:id/complete", limiter, requireAuth, completeTransaction);
+router.patch("/acquisition-requests/:id/vendor/accept", limiter, requireAuth, vendorAccept);
+router.post("/acquisition-requests/:id/receipt", limiter, requireAuth, uploadReceipt);
+router.post("/acquisition-requests/:id/vendor/confirm-payment", limiter, requireAuth, vendorConfirmPayment);
+router.post("/acquisition-requests/:id/client/confirm-completed", limiter, requireAuth, customerConfirmCompleted);
 
 // Reviews
 router.post("/acquisition-requests/:id/review", limiter, requireAuth, createReview);

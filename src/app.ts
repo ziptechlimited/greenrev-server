@@ -8,6 +8,7 @@ import rbacRoutes from "./routes/rbacRoutes";
 import productRoutes from "./routes/productRoutes";
 import profileRoutes from "./routes/profileRoutes";
 import acquisitionRoutes from "./routes/acquisitionRoutes";
+import adminAcquisitionRoutes from "./routes/adminAcquisitionRoutes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { env } from "./config/env";
 import { sanitizeRequest } from "./middleware/sanitize";
@@ -45,6 +46,7 @@ export function createApp() {
   app.use("/api/v1", productRoutes);
   app.use("/api/v1", profileRoutes);
   app.use("/api/v1", acquisitionRoutes);
+  app.use("/api/v1", adminAcquisitionRoutes);
   app.use("/api/v1", expertRoutes);
   app.use("/api/v1", mechanicRoutes);
   app.use("/api/v1", bookingRoutes);

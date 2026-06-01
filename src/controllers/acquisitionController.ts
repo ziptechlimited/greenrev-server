@@ -1,48 +1,84 @@
 import type { Response } from "express";
+import mongoose from "mongoose";
 import { AcquisitionRequest } from "../models/AcquisitionRequest";
+import { AcquisitionEvent } from "../models/AcquisitionEvent";
 import { Product } from "../models/Product";
 import { User } from "../models/User";
 import { Review } from "../models/Review";
 import type { CustomReq } from "../types/auth";
 import { sendSuccess, sendError } from "../utils/apiResponse";
+import type { AcquisitionStatus } from "../types/acquisition";
 
 // ─── Customer: Create a request ──────────────────────────────────────────────
 export async function createRequest(req: CustomReq, res: Response) {
   try {
     if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
     if (req.user.role !== "customer") {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Only customers can place acquisition requests" });
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Only customers can place acquisition requests",
+      });
     }
 
-    const { productId, message } = req.body;
+    const { productId, message } = req.body as {
+      productId?: string;
+      message?: string;
+    };
 
     if (!productId) {
-      return sendError(res, 400, { code: "VALIDATION_ERROR", message: "Product ID is required" });
+      return sendError(res, 400, {
+        code: "VALIDATION_ERROR",
+        message: "Product ID is required",
+      });
     }
 
     // Fetch product + vendor info
     const product = await Product.findById(productId).lean();
     if (!product) {
-      return sendError(res, 404, { code: "NOT_FOUND", message: "Product not found" });
+      return sendError(res, 404, {
+        code: "NOT_FOUND",
+        message: "Product not found",
+      });
     }
 
-    const vendor = await User.findById(product.vendorId).select("name companyName email phone").lean();
+    const vendor = await User.findById(product.vendorId)
+      .select("name companyName email phone role")
+      .lean();
     if (!vendor) {
-      return sendError(res, 404, { code: "NOT_FOUND", message: "Vendor not found" });
+      return sendError(res, 404, {
+        code: "NOT_FOUND",
+        message: "Vendor not found",
+      });
+    }
+    if ((vendor as any).role !== "vendor") {
+      return sendError(res, 400, {
+        code: "INVALID_VENDOR",
+        message: "Product vendor is not a vendor account",
+      });
     }
 
-    const customer = await User.findById(req.user.id).select("name email phone").lean();
+    const customer = await User.findById(req.user.id)
+      .select("name email phone")
+      .lean();
     if (!customer) {
-      return sendError(res, 404, { code: "NOT_FOUND", message: "Customer not found" });
+      return sendError(res, 404, {
+        code: "NOT_FOUND",
+        message: "Customer not found",
+      });
     }
 
     // Check for an existing active request for same product
     const existing = await AcquisitionRequest.findOne({
       customerId: req.user.id,
       productId,
-      status: { $in: ["pending", "accepted", "in_progress"] },
+      status: {
+        $in: ["pending", "accepted", "receipt_uploaded", "payment_confirmed"],
+      },
     });
     if (existing) {
       return sendError(res, 409, {
@@ -51,47 +87,78 @@ export async function createRequest(req: CustomReq, res: Response) {
       });
     }
 
-    const acquisitionRequest = new AcquisitionRequest({
-      customerId: req.user.id,
-      customerName: customer.name || "Customer",
-      customerEmail: customer.email,
-      customerPhone: (customer as any).phone || null,
-      vendorId: product.vendorId,
-      vendorName: (vendor as any).name || (vendor as any).companyName || "Vendor",
-      vendorEmail: (vendor as any).email,
-      vendorPhone: (vendor as any).phone || null,
-      vendorCompanyName: (vendor as any).companyName || null,
-      productId,
-      productName: product.name,
-      productImage: product.image,
-      productPrice: product.price,
-      productMake: product.make || null,
-      message: message || null,
-      status: "pending",
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const created = await AcquisitionRequest.create(
+        [
+          {
+            customerId: req.user.id,
+            customerName: (customer as any).name || "Customer",
+            customerEmail: (customer as any).email,
+            customerPhone: (customer as any).phone || null,
+            vendorId: product.vendorId,
+            vendorName:
+              (vendor as any).name || (vendor as any).companyName || "Vendor",
+            vendorEmail: (vendor as any).email,
+            vendorPhone: (vendor as any).phone || null,
+            vendorCompanyName: (vendor as any).companyName || null,
+            productId,
+            productName: (product as any).name,
+            productImage: (product as any).image,
+            productPrice: (product as any).price,
+            productMake: (product as any).make || null,
+            message: message || null,
+            status: "pending",
+          },
+        ],
+        { session },
+      );
 
-    await acquisitionRequest.save();
+      await AcquisitionEvent.create(
+        [
+          {
+            requestId: created[0]._id,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            action: "created",
+            fromStatus: null,
+            toStatus: "pending",
+            metadata: null,
+          },
+        ],
+        { session },
+      );
 
-    return sendSuccess(res, 201, {
-      request: acquisitionRequest,
-      vendorContact: {
-        name: (vendor as any).name || (vendor as any).companyName,
-        email: (vendor as any).email,
-        phone: (vendor as any).phone || null,
-        companyName: (vendor as any).companyName || null,
-      },
-    });
+      await session.commitTransaction();
+      return sendSuccess(res, 201, { request: created[0] });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
     console.error("Error creating acquisition request:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to create acquisition request" });
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to create acquisition request",
+    });
   }
+}
+
+function canRevealVendorContact(status: AcquisitionStatus): boolean {
+  return status !== "pending";
 }
 
 // ─── Customer: Get their requests ────────────────────────────────────────────
 export async function getCustomerRequests(req: CustomReq, res: Response) {
   try {
     if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
 
     const requests = await AcquisitionRequest.find({ customerId: req.user.id })
@@ -100,18 +167,31 @@ export async function getCustomerRequests(req: CustomReq, res: Response) {
 
     // Attach review data
     const requestIds = requests.map((r) => r._id);
-    const reviews = await Review.find({ acquisitionRequestId: { $in: requestIds } }).lean();
-    const reviewMap = new Map(reviews.map((rv) => [rv.acquisitionRequestId!.toString(), rv]));
+    const reviews = await Review.find({
+      acquisitionRequestId: { $in: requestIds },
+    }).lean();
+    const reviewMap = new Map(
+      reviews.map((rv) => [rv.acquisitionRequestId!.toString(), rv]),
+    );
 
-    const enriched = requests.map((r) => ({
-      ...r,
-      review: reviewMap.get((r._id as any).toString()) || null,
-    }));
+    const enriched = requests.map((r) => {
+      const reveal = canRevealVendorContact(r.status as AcquisitionStatus);
+      return {
+        ...r,
+        vendorEmail: reveal ? (r as any).vendorEmail : null,
+        vendorPhone: reveal ? (r as any).vendorPhone : null,
+        vendorCompanyName: reveal ? (r as any).vendorCompanyName : null,
+        review: reviewMap.get((r._id as any).toString()) || null,
+      };
+    });
 
     return sendSuccess(res, 200, { requests: enriched });
   } catch (error) {
     console.error("Error fetching customer requests:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to fetch requests" });
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to fetch requests",
+    });
   }
 }
 
@@ -119,10 +199,16 @@ export async function getCustomerRequests(req: CustomReq, res: Response) {
 export async function getVendorRequests(req: CustomReq, res: Response) {
   try {
     if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
     if (req.user.role !== "vendor" && req.user.role !== "admin") {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Vendor access only" });
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Vendor access only",
+      });
     }
 
     const requests = await AcquisitionRequest.find({ vendorId: req.user.id })
@@ -132,7 +218,10 @@ export async function getVendorRequests(req: CustomReq, res: Response) {
     return sendSuccess(res, 200, { requests });
   } catch (error) {
     console.error("Error fetching vendor requests:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to fetch requests" });
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to fetch requests",
+    });
   }
 }
 
@@ -140,10 +229,16 @@ export async function getVendorRequests(req: CustomReq, res: Response) {
 export async function getVendorRequestCount(req: CustomReq, res: Response) {
   try {
     if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
     if (req.user.role !== "vendor" && req.user.role !== "admin") {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Vendor access only" });
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Vendor access only",
+      });
     }
 
     const count = await AcquisitionRequest.countDocuments({
@@ -154,97 +249,310 @@ export async function getVendorRequestCount(req: CustomReq, res: Response) {
     return sendSuccess(res, 200, { count });
   } catch (error) {
     console.error("Error fetching vendor request count:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to fetch count" });
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to fetch count",
+    });
   }
 }
 
-// ─── Shared: Update status ───────────────────────────────────────────────────
-export async function updateStatus(req: CustomReq, res: Response) {
+export async function vendorAccept(req: CustomReq, res: Response) {
   try {
     if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
-    }
-
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const validStatuses = ["pending", "accepted", "in_progress", "completed", "cancelled"];
-    if (!status || !validStatuses.includes(status)) {
-      return sendError(res, 400, { code: "VALIDATION_ERROR", message: "Invalid status value" });
-    }
-
-    const request = await AcquisitionRequest.findById(id);
-    if (!request) {
-      return sendError(res, 404, { code: "NOT_FOUND", message: "Request not found" });
-    }
-
-    const isCustomer = request.customerId.toString() === req.user.id;
-    const isVendor = request.vendorId.toString() === req.user.id;
-
-    if (!isCustomer && !isVendor && req.user.role !== "admin") {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Not authorized to update this request" });
-    }
-
-    // Role-based status rules
-    if (isCustomer && !["in_progress", "cancelled"].includes(status)) {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Customers can only set status to in_progress or cancelled" });
-    }
-    if (isVendor && !["accepted", "in_progress", "completed", "cancelled"].includes(status)) {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Vendors cannot set this status" });
-    }
-    if (request.status === "completed" || request.status === "cancelled") {
-      return sendError(res, 400, { code: "INVALID_STATE", message: "Cannot update a completed or cancelled request" });
-    }
-
-    request.status = status;
-    if (status === "accepted") request.acceptedAt = new Date();
-    if (status === "completed") request.completedAt = new Date();
-    if (status === "cancelled") request.cancelledAt = new Date();
-    if (isVendor) request.vendorSeen = true;
-
-    await request.save();
-
-    return sendSuccess(res, 200, { request });
-  } catch (error) {
-    console.error("Error updating request status:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to update status" });
-  }
-}
-
-// ─── Vendor: Mark transaction complete ──────────────────────────────────────
-export async function completeTransaction(req: CustomReq, res: Response) {
-  try {
-    if (!req.user) {
-      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
     if (req.user.role !== "vendor" && req.user.role !== "admin") {
-      return sendError(res, 403, { code: "FORBIDDEN", message: "Vendor access only" });
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Vendor access only",
+      });
     }
 
     const { id } = req.params;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const updated = await AcquisitionRequest.findOneAndUpdate(
+        { _id: id, vendorId: req.user.id, status: "pending" },
+        {
+          $set: {
+            status: "accepted",
+            acceptedAt: new Date(),
+            vendorSeen: true,
+          },
+        },
+        { new: true, session },
+      );
+      if (!updated) {
+        await session.abortTransaction();
+        return sendError(res, 400, {
+          code: "INVALID_STATE",
+          message: "Request cannot be accepted",
+        });
+      }
 
-    const request = await AcquisitionRequest.findOne({
-      _id: id,
-      vendorId: req.user.id,
+      await AcquisitionEvent.create(
+        [
+          {
+            requestId: updated._id,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            action: "vendor_accepted",
+            fromStatus: "pending",
+            toStatus: "accepted",
+            metadata: null,
+          },
+        ],
+        { session },
+      );
+
+      await session.commitTransaction();
+      return sendSuccess(res, 200, { request: updated });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error("Error accepting request:", error);
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to accept request",
     });
-    if (!request) {
-      return sendError(res, 404, { code: "NOT_FOUND", message: "Request not found" });
+  }
+}
+
+export async function uploadReceipt(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
     }
-    if (request.status === "cancelled") {
-      return sendError(res, 400, { code: "INVALID_STATE", message: "Cannot complete a cancelled request" });
-    }
-    if (request.status === "completed") {
-      return sendError(res, 400, { code: "INVALID_STATE", message: "Request is already completed" });
+    if (req.user.role !== "customer") {
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Customer access only",
+      });
     }
 
-    request.status = "completed";
-    request.completedAt = new Date();
-    request.vendorSeen = true;
-    await request.save();
+    const { id } = req.params;
+    const { receiptUrl } = req.body as { receiptUrl?: string };
+    if (
+      !receiptUrl ||
+      typeof receiptUrl !== "string" ||
+      receiptUrl.length < 8
+    ) {
+      return sendError(res, 400, {
+        code: "VALIDATION_ERROR",
+        message: "Receipt URL is required",
+      });
+    }
 
-    return sendSuccess(res, 200, { request });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const updated = await AcquisitionRequest.findOneAndUpdate(
+        { _id: id, customerId: req.user.id, status: "accepted" },
+        {
+          $set: {
+            status: "receipt_uploaded",
+            receiptUrl,
+            receiptUploadedAt: new Date(),
+          },
+        },
+        { new: true, session },
+      );
+      if (!updated) {
+        await session.abortTransaction();
+        return sendError(res, 400, {
+          code: "INVALID_STATE",
+          message: "Receipt cannot be uploaded",
+        });
+      }
+
+      await AcquisitionEvent.create(
+        [
+          {
+            requestId: updated._id,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            action: "receipt_uploaded",
+            fromStatus: "accepted",
+            toStatus: "receipt_uploaded",
+            metadata: { receiptUrl },
+          },
+        ],
+        { session },
+      );
+
+      await session.commitTransaction();
+      return sendSuccess(res, 200, { request: updated });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error("Error uploading receipt:", error);
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to upload receipt",
+    });
+  }
+}
+
+export async function vendorConfirmPayment(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
+    }
+    if (req.user.role !== "vendor" && req.user.role !== "admin") {
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Vendor access only",
+      });
+    }
+
+    const { id } = req.params;
+    const { amount } = req.body as { amount?: unknown };
+    const parsed =
+      typeof amount === "number"
+        ? amount
+        : typeof amount === "string"
+          ? Number(amount)
+          : NaN;
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return sendError(res, 400, {
+        code: "VALIDATION_ERROR",
+        message: "Amount must be a positive number",
+      });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const updated = await AcquisitionRequest.findOneAndUpdate(
+        { _id: id, vendorId: req.user.id, status: "receipt_uploaded" },
+        {
+          $set: {
+            status: "payment_confirmed",
+            vendorPaymentAmount: parsed,
+            vendorPaymentConfirmedAt: new Date(),
+            vendorSeen: true,
+          },
+        },
+        { new: true, session },
+      );
+      if (!updated) {
+        await session.abortTransaction();
+        return sendError(res, 400, {
+          code: "INVALID_STATE",
+          message: "Payment cannot be confirmed",
+        });
+      }
+
+      await AcquisitionEvent.create(
+        [
+          {
+            requestId: updated._id,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            action: "payment_confirmed",
+            fromStatus: "receipt_uploaded",
+            toStatus: "payment_confirmed",
+            metadata: { amount: parsed },
+          },
+        ],
+        { session },
+      );
+
+      await session.commitTransaction();
+      return sendSuccess(res, 200, { request: updated });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error("Error confirming payment:", error);
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to confirm payment",
+    });
+  }
+}
+
+export async function customerConfirmCompleted(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
+    }
+    if (req.user.role !== "customer") {
+      return sendError(res, 403, {
+        code: "FORBIDDEN",
+        message: "Customer access only",
+      });
+    }
+
+    const { id } = req.params;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const updated = await AcquisitionRequest.findOneAndUpdate(
+        { _id: id, customerId: req.user.id, status: "payment_confirmed" },
+        { $set: { status: "completed", completedAt: new Date() } },
+        { new: true, session },
+      );
+      if (!updated) {
+        await session.abortTransaction();
+        return sendError(res, 400, {
+          code: "INVALID_STATE",
+          message: "Transaction cannot be completed",
+        });
+      }
+
+      await AcquisitionEvent.create(
+        [
+          {
+            requestId: updated._id,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            action: "client_completed",
+            fromStatus: "payment_confirmed",
+            toStatus: "completed",
+            metadata: null,
+          },
+        ],
+        { session },
+      );
+
+      await session.commitTransaction();
+      return sendSuccess(res, 200, { request: updated });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
     console.error("Error completing transaction:", error);
-    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to complete transaction" });
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to complete transaction",
+    });
   }
 }

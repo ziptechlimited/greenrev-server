@@ -5,7 +5,7 @@ import { sha256Base64Url } from "../utils/crypto";
 import { AuthToken } from "../models/AuthToken";
 import { User } from "../models/User";
 
-let mongo: MongoMemoryServer;
+let mongo: MongoMemoryServer | null = null;
 
 function cookieValue(
   setCookieHeader: string[] | undefined,
@@ -26,12 +26,12 @@ describe("auth", () => {
     process.env.JWT_ACCESS_SECRET = "test_access_secret";
     process.env.OAUTH_STATE_SECRET = "test_oauth_state_secret";
     await mongoose.connect(process.env.MONGO_URI);
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongo.stop();
-  });
+    if (mongo) await mongo.stop();
+  }, 30_000);
 
   it("register -> verify email -> login -> me -> refresh", async () => {
     const { createApp } = require("../app") as typeof import("../app");

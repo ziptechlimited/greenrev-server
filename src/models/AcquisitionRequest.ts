@@ -1,76 +1,40 @@
 import { Schema, model, type InferSchemaType } from "mongoose";
+import type { AcquisitionStatus } from "../types/acquisition";
 
 const acquisitionRequestSchema = new Schema(
   {
-    // Customer info
-    customerId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
+    customerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     customerName: { type: String, required: true },
     customerEmail: { type: String, required: true },
-    customerPhone: { type: String, default: null },
-
-    // Vendor info (snapshot at time of request)
-    vendorId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
+    customerPhone: { type: String, required: false, default: null },
+    vendorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     vendorName: { type: String, required: true },
     vendorEmail: { type: String, required: true },
-    vendorPhone: { type: String, default: null },
-    vendorCompanyName: { type: String, default: null },
-
-    // Product info (snapshot)
-    productId: {
-      type: Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    },
+    vendorPhone: { type: String, required: false, default: null },
+    vendorCompanyName: { type: String, required: false, default: null },
+    productId: { type: String, required: true, index: true },
     productName: { type: String, required: true },
     productImage: { type: String, required: true },
     productPrice: { type: String, required: true },
-    productMake: { type: String, default: null },
-
-    // Request details
-    message: { type: String, default: null, maxlength: 1000 },
-    status: {
-      type: String,
-      required: true,
-      enum: ["pending", "accepted", "in_progress", "completed", "cancelled"],
-      default: "pending",
-      index: true,
-    },
-
-    // Timestamps for specific status changes
-    acceptedAt: { type: Date, default: null },
-    completedAt: { type: Date, default: null },
-    cancelledAt: { type: Date, default: null },
-
-    // Whether vendor has seen this request (for notification badge)
-    vendorSeen: { type: Boolean, default: false },
-
-    // Review (populated separately via Review model)
-    hasReview: { type: Boolean, default: false },
+    productMake: { type: String, required: false, default: null },
+    message: { type: String, required: false, default: null },
+    status: { type: String, required: true, default: "pending", enum: ["pending", "accepted", "receipt_uploaded", "payment_confirmed", "completed"] satisfies AcquisitionStatus[] },
+    acceptedAt: { type: Date, required: false, default: null },
+    receiptUrl: { type: String, required: false, default: null },
+    receiptUploadedAt: { type: Date, required: false, default: null },
+    vendorPaymentAmount: { type: Number, required: false, default: null },
+    vendorPaymentConfirmedAt: { type: Date, required: false, default: null },
+    completedAt: { type: Date, required: false, default: null },
+    vendorSeen: { type: Boolean, required: true, default: false },
+    hasReview: { type: Boolean, required: true, default: false },
+    adminFlaggedAt: { type: Date, required: false, default: null },
+    adminFlagReason: { type: String, required: false, default: null },
+    adminResolvedAt: { type: Date, required: false, default: null },
+    adminResolution: { type: String, required: false, default: null },
   },
   { timestamps: true },
 );
 
-// Compound index to prevent duplicate pending requests for same product
-acquisitionRequestSchema.index(
-  { customerId: 1, productId: 1 },
-  { unique: false },
-);
+export type AcquisitionRequestDocument = InferSchemaType<typeof acquisitionRequestSchema>;
 
-export type AcquisitionRequestDocument = InferSchemaType<
-  typeof acquisitionRequestSchema
-> & { _id: unknown };
-
-export const AcquisitionRequest = model(
-  "AcquisitionRequest",
-  acquisitionRequestSchema,
-);
+export const AcquisitionRequest = model("AcquisitionRequest", acquisitionRequestSchema);
