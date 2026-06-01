@@ -23,6 +23,7 @@ import {
   rotateRefreshToken,
 } from "../services/tokenService";
 import { sendEmail } from "../services/emailService";
+import { getVerificationEmailTemplate, getPasswordResetTemplate } from "../utils/emailTemplates";
 import type { CustomReq, UserRole } from "../types/auth";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -147,7 +148,7 @@ export async function register(req: Request, res: Response) {
   await sendEmail({
     to: user.email,
     subject: "Verify your email",
-    html: `<p>Your email verification PIN is:</p><h2>${verifyPin}</h2><p>Please enter this PIN to verify your email address.</p>`,
+    html: getVerificationEmailTemplate(verifyPin),
   });
 
   return sendSuccess(res, 201, { user: publicUser(user) });
@@ -290,7 +291,7 @@ export async function resendVerification(req: Request, res: Response) {
   await sendEmail({
     to: user.email,
     subject: "Verify your email",
-    html: `<p>Your email verification PIN is:</p><h2>${verifyPin}</h2><p>Please enter this PIN to verify your email address.</p>`,
+    html: getVerificationEmailTemplate(verifyPin),
   });
 
   return sendSuccess(res, 200, { ok: true });
@@ -319,7 +320,7 @@ export async function forgotPassword(req: Request, res: Response) {
   await sendEmail({
     to: user.email,
     subject: "Reset your password",
-    html: `<p>Reset your password using the link below (expires in 1 hour):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+    html: getPasswordResetTemplate(resetUrl),
   });
 
   return sendSuccess(res, 200, { ok: true });

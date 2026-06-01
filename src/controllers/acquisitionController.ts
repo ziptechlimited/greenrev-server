@@ -9,6 +9,8 @@ import type { CustomReq } from "../types/auth";
 import { sendSuccess, sendError } from "../utils/apiResponse";
 import type { AcquisitionStatus } from "../types/acquisition";
 import { uploadImage } from "../utils/cloudinary";
+import { sendEmail } from "../services/emailService";
+import { getNewAcquisitionRequestTemplate } from "../utils/emailTemplates";
 // ─── Customer: Create a request ──────────────────────────────────────────────
 export async function createRequest(req: CustomReq, res: Response) {
   try {
@@ -131,6 +133,21 @@ export async function createRequest(req: CustomReq, res: Response) {
       );
 
       await session.commitTransaction();
+
+      // Send email to vendor
+      try {
+        await sendEmail({
+          to: (vendor as any).email,
+          subject: "New Acquisition Request on GreenRev",
+          html: getNewAcquisitionRequestTemplate(
+            (customer as any).name || "Customer",
+            (product as any).name
+          ),
+        });
+      } catch (emailErr) {
+        console.error("Failed to send vendor notification email:", emailErr);
+      }
+
       return sendSuccess(res, 201, { request: created[0] });
     } catch (e) {
       await session.abortTransaction();
