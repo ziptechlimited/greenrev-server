@@ -136,19 +136,18 @@ export async function register(req: Request, res: Response) {
     isEmailVerified: false,
   });
 
-  const verifyToken = randomToken(48);
+  const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
   await AuthToken.create({
     userId: user._id,
     type: "email_verify",
-    tokenHash: sha256Base64Url(verifyToken),
+    tokenHash: sha256Base64Url(verifyPin),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  const verifyUrl = `${env.frontendUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(verifyToken)}`;
   await sendEmail({
     to: user.email,
     subject: "Verify your email",
-    html: `<p>Verify your email address by clicking the link below:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+    html: `<p>Your email verification PIN is:</p><h2>${verifyPin}</h2><p>Please enter this PIN to verify your email address.</p>`,
   });
 
   return sendSuccess(res, 201, { user: publicUser(user) });
@@ -238,20 +237,23 @@ export async function logout(req: Request, res: Response) {
 }
 
 export async function verifyEmail(req: Request, res: Response) {
-  const { token } = req.body as Record<string, unknown>;
-  if (typeof token !== "string" || token.length < 20) {
-    throw new ApiError(400, "INVALID_TOKEN", "Invalid token");
+  const { pin, email } = req.body as Record<string, unknown>;
+  if (typeof pin !== "string" || pin.length !== 6) {
+    throw new ApiError(400, "INVALID_PIN", "Invalid PIN");
+  }
+  if (typeof email !== "string" || !emailRegex.test(email)) {
+    throw new ApiError(400, "INVALID_EMAIL", "Invalid email");
   }
 
-  const tokenHash = sha256Base64Url(token);
-  const record = await AuthToken.findOne({ tokenHash, type: "email_verify" });
-  if (!record || record.usedAt || record.expiresAt.getTime() <= Date.now()) {
-    throw new ApiError(400, "INVALID_TOKEN", "Invalid token");
-  }
-
-  const user = await User.findById(record.userId);
+  const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
-    throw new ApiError(400, "INVALID_TOKEN", "Invalid token");
+    throw new ApiError(400, "INVALID_PIN", "Invalid PIN or email");
+  }
+
+  const tokenHash = sha256Base64Url(pin);
+  const record = await AuthToken.findOne({ tokenHash, type: "email_verify", userId: user._id });
+  if (!record || record.usedAt || record.expiresAt.getTime() <= Date.now()) {
+    throw new ApiError(400, "INVALID_PIN", "Invalid PIN");
   }
 
   user.isEmailVerified = true;
@@ -277,19 +279,18 @@ export async function resendVerification(req: Request, res: Response) {
     return sendSuccess(res, 200, { ok: true });
   }
 
-  const verifyToken = randomToken(48);
+  const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
   await AuthToken.create({
     userId: user._id,
     type: "email_verify",
-    tokenHash: sha256Base64Url(verifyToken),
+    tokenHash: sha256Base64Url(verifyPin),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
-  const verifyUrl = `${env.frontendUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(verifyToken)}`;
   await sendEmail({
     to: user.email,
     subject: "Verify your email",
-    html: `<p>Verify your email address by clicking the link below:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+    html: `<p>Your email verification PIN is:</p><h2>${verifyPin}</h2><p>Please enter this PIN to verify your email address.</p>`,
   });
 
   return sendSuccess(res, 200, { ok: true });
