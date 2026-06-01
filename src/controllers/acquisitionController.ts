@@ -27,8 +27,9 @@ export async function createRequest(req: CustomReq, res: Response) {
       });
     }
 
-    const { productId, message } = req.body as {
+    const { productId, quantity, message } = req.body as {
       productId?: string;
+      quantity?: number;
       message?: string;
     };
 
@@ -74,19 +75,21 @@ export async function createRequest(req: CustomReq, res: Response) {
       });
     }
 
-    // Check for an existing active request for same product
-    const existing = await AcquisitionRequest.findOne({
-      customerId: req.user.id,
-      productId,
-      status: {
-        $in: ["pending", "accepted", "receipt_uploaded", "payment_confirmed"],
-      },
-    });
-    if (existing) {
-      return sendError(res, 409, {
-        code: "DUPLICATE_REQUEST",
-        message: "You already have an active request for this product",
+    // Check for an existing active request for same product if it's a vehicle
+    if ((product as any).category === "vehicle") {
+      const existing = await AcquisitionRequest.findOne({
+        customerId: req.user.id,
+        productId,
+        status: {
+          $in: ["pending", "accepted", "receipt_uploaded", "payment_confirmed"],
+        },
       });
+      if (existing) {
+        return sendError(res, 409, {
+          code: "DUPLICATE_REQUEST",
+          message: "You already have an active request for this product",
+        });
+      }
     }
 
     const session = await mongoose.startSession();
@@ -110,6 +113,7 @@ export async function createRequest(req: CustomReq, res: Response) {
             productImage: (product as any).image,
             productPrice: (product as any).price,
             productMake: (product as any).make || null,
+            quantity: quantity || 1,
             message: message || null,
             status: "pending",
           },

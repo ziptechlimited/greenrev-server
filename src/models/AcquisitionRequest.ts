@@ -17,6 +17,7 @@ const acquisitionRequestSchema = new Schema(
     productImage: { type: String, required: true },
     productPrice: { type: String, required: true },
     productMake: { type: String, required: false, default: null },
+    quantity: { type: Number, required: true, default: 1 },
     message: { type: String, required: false, default: null },
     status: { type: String, required: true, default: "pending", enum: ["pending", "accepted", "receipt_uploaded", "payment_confirmed", "completed"] satisfies AcquisitionStatus[] },
     acceptedAt: { type: Date, required: false, default: null },
