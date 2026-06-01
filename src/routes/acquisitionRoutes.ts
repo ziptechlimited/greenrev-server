@@ -10,6 +10,7 @@ import {
   customerConfirmCompleted,
 } from "../controllers/acquisitionController";
 import { createReview, getVendorReviews } from "../controllers/reviewController";
+import { getMessages, sendMessage } from "../controllers/messageController";
 import { requireAuth } from "../middleware/auth";
 import { slidingWindowRateLimit } from "../middleware/rateLimit";
 
@@ -26,6 +27,10 @@ router.patch("/acquisition-requests/:id/vendor/accept", limiter, requireAuth, ve
 router.post("/acquisition-requests/:id/receipt", limiter, requireAuth, uploadReceipt);
 router.post("/acquisition-requests/:id/vendor/confirm-payment", limiter, requireAuth, vendorConfirmPayment);
 router.post("/acquisition-requests/:id/client/confirm-completed", limiter, requireAuth, customerConfirmCompleted);
+
+// Messages
+router.get("/acquisition-requests/:id/messages", limiter, requireAuth, getMessages);
+router.post("/acquisition-requests/:id/messages", limiter, requireAuth, sendMessage);
 
 // Reviews
 router.post("/acquisition-requests/:id/review", limiter, requireAuth, createReview);

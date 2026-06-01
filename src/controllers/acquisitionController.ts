@@ -8,7 +8,7 @@ import { Review } from "../models/Review";
 import type { CustomReq } from "../types/auth";
 import { sendSuccess, sendError } from "../utils/apiResponse";
 import type { AcquisitionStatus } from "../types/acquisition";
-
+import { uploadImage } from "../utils/cloudinary";
 // ─── Customer: Create a request ──────────────────────────────────────────────
 export async function createRequest(req: CustomReq, res: Response) {
   try {
@@ -342,15 +342,24 @@ export async function uploadReceipt(req: CustomReq, res: Response) {
     }
 
     const { id } = req.params;
-    const { receiptUrl } = req.body as { receiptUrl?: string };
+    const { receiptImageBase64 } = req.body as { receiptImageBase64?: string };
     if (
-      !receiptUrl ||
-      typeof receiptUrl !== "string" ||
-      receiptUrl.length < 8
+      !receiptImageBase64 ||
+      typeof receiptImageBase64 !== "string"
     ) {
       return sendError(res, 400, {
         code: "VALIDATION_ERROR",
-        message: "Receipt URL is required",
+        message: "Receipt image is required",
+      });
+    }
+
+    let receiptUrl = "";
+    try {
+      receiptUrl = await uploadImage(receiptImageBase64, "greenrev_receipts");
+    } catch (err) {
+      return sendError(res, 500, {
+        code: "UPLOAD_ERROR",
+        message: "Failed to upload receipt image to Cloudinary",
       });
     }
 
