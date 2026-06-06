@@ -14,6 +14,9 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: false, default: null },
     googleId: { type: String, required: false, default: null, index: true },
     isEmailVerified: { type: Boolean, required: true, default: false },
+    isPhoneVerified: { type: Boolean, required: true, default: false },
+    verificationLevel: { type: String, required: true, enum: ["basic", "individual", "business"], default: "basic" },
+    verificationStatus: { type: String, required: true, enum: ["unverified", "pending", "verified", "rejected"], default: "unverified" },
     // Fields for Mechanics / Experts
     city: { type: String, required: false, default: null },
     country: { type: String, required: false, default: null },

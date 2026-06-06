@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { ApiError } from "../utils/errors";
 import { verifyAccessToken } from "../utils/jwt";
 import { User } from "../models/User";
-import type { CustomReq, UserRole } from "../types/auth";
+import type { CustomReq, UserRole, VerificationLevel } from "../types/auth";
 
 function extractAccessToken(req: Request): string | undefined {
   const cookieToken =
@@ -41,6 +41,9 @@ export async function requireAuth(
       role: user.role as UserRole,
       name: user.name ?? null,
       isEmailVerified: Boolean(user.isEmailVerified),
+      isPhoneVerified: Boolean(user.isPhoneVerified),
+      verificationLevel: (user.verificationLevel as any) || "basic",
+      verificationStatus: (user.verificationStatus as any) || "unverified",
     };
 
     next();
@@ -63,3 +66,19 @@ export function requireRole(roles: UserRole[]) {
     next();
   };
 }
+
+export function requireVerificationLevel(levels: VerificationLevel[]) {
+  return (req: CustomReq, _res: Response, next: NextFunction) => {
+    const level = req.user?.verificationLevel;
+    if (!level) {
+      next(new ApiError(401, "UNAUTHENTICATED", "Authentication required"));
+      return;
+    }
+    if (!levels.includes(level)) {
+      next(new ApiError(403, "FORBIDDEN", "Insufficient verification level"));
+      return;
+    }
+    next();
+  };
+}
+

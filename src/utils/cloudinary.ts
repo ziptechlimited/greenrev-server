@@ -26,3 +26,40 @@ export async function uploadImage(
     throw new Error("Failed to upload image");
   }
 }
+
+/**
+ * Uploads a file buffer to Cloudinary
+ * @param buffer The file buffer to upload
+ * @param mimetype The mime type of the file
+ * @param folder The folder in cloudinary to store the file
+ * @returns The secure URL of the uploaded file
+ */
+export async function uploadFile(
+  buffer: Buffer,
+  mimetype: string,
+  folder: string = "greenrev_products",
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const resourceType = mimetype.startsWith("image/") ? "image" : "raw";
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: resourceType,
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary stream upload error:", error);
+          return reject(new Error("Failed to upload file to Cloudinary"));
+        }
+        if (result) {
+          resolve(result.secure_url);
+        } else {
+          reject(new Error("Cloudinary upload failed to return a URL"));
+        }
+      }
+    );
+
+    uploadStream.end(buffer);
+  });
+}
