@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { VerificationController } from "../controllers/VerificationController";
 import { requireAuth } from "../middleware/auth";
+import { smileWebhookHandler } from "../controllers/SmileWebhookController";
 
 const router = Router();
 
-// All verification routes require authentication
+// ── Public webhook — called by Smile ID servers, NOT end users ──────────────
+router.post("/webhook", smileWebhookHandler);
+
+// All other verification routes require authentication
 router.use(requireAuth);
 
 router.post("/individual", VerificationController.submitIndividual);

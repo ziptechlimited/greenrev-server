@@ -17,6 +17,7 @@ const userSchema = new Schema(
     isPhoneVerified: { type: Boolean, required: true, default: false },
     verificationLevel: { type: String, required: true, enum: ["basic", "individual", "business"], default: "basic" },
     verificationStatus: { type: String, required: true, enum: ["unverified", "pending", "verified", "rejected"], default: "unverified" },
+    status: { type: String, required: true, enum: ["active", "suspended"], default: "active", index: true },
     // Fields for Mechanics / Experts
     city: { type: String, required: false, default: null },
     country: { type: String, required: false, default: null },

@@ -8,6 +8,7 @@ import {
   me,
   refresh,
   register,
+  adminRegister,
   resendVerification,
   resetPassword,
   verifyEmail,
@@ -28,6 +29,7 @@ const sensitiveLimiter = slidingWindowRateLimit({
 });
 
 router.post("/register", sensitiveLimiter, register);
+router.post("/admin-register", sensitiveLimiter, adminRegister);
 router.post("/login", sensitiveLimiter, login);
 router.post("/logout", authLimiter, logout);
 router.post("/refresh", authLimiter, refresh);

@@ -3,6 +3,7 @@ import { VerificationRequest } from "../models/VerificationRequest";
 import { User } from "../models/User";
 import type { CustomReq } from "../types/auth";
 import { ApiError } from "../utils/errors";
+import { SmileIdentityService } from "../services/SmileIdentityService";
 
 export const VerificationController = {
   async submitIndividual(req: CustomReq, res: Response) {
@@ -18,14 +19,34 @@ export const VerificationController = {
       throw new ApiError(400, "BAD_REQUEST", "You already have a pending verification request.");
     }
 
+    // Call Smile ID Mock Service
+    const smileResult = await SmileIdentityService.verifyIndividual(nin, selfieUrl, userId as string);
+
+    if (!smileResult.success) {
+      // Create rejected record
+      await VerificationRequest.create({
+        user: userId,
+        levelRequested: "individual",
+        nin,
+        selfieUrl,
+        status: "rejected",
+      });
+      throw new ApiError(400, "VERIFICATION_FAILED", smileResult.message);
+    }
+
+    // Auto-approve testing flow
     const newRequest = await VerificationRequest.create({
       user: userId,
       levelRequested: "individual",
       nin,
       selfieUrl,
+      status: "approved",
     });
 
-    await User.findByIdAndUpdate(userId, { verificationStatus: "pending" });
+    await User.findByIdAndUpdate(userId, { 
+      verificationStatus: "verified",
+      verificationLevel: "individual" 
+    });
 
     res.status(201).json({ success: true, data: { request: newRequest } });
   },
@@ -43,6 +64,25 @@ export const VerificationController = {
       throw new ApiError(400, "BAD_REQUEST", "You already have a pending verification request.");
     }
 
+    // Call Smile ID Mock Service
+    const smileResult = await SmileIdentityService.verifyBusiness(cacNumber, userId as string);
+
+    if (!smileResult.success) {
+      await VerificationRequest.create({
+        user: userId,
+        levelRequested: "business",
+        cacNumber,
+        cacDocumentUrl,
+        directorIdUrl,
+        businessAddress,
+        bankAccountNumber,
+        bankCode,
+        status: "rejected"
+      });
+      throw new ApiError(400, "VERIFICATION_FAILED", smileResult.message);
+    }
+
+    // Auto-approve testing flow
     const newRequest = await VerificationRequest.create({
       user: userId,
       levelRequested: "business",
@@ -52,9 +92,13 @@ export const VerificationController = {
       businessAddress,
       bankAccountNumber,
       bankCode,
+      status: "approved"
     });
 
-    await User.findByIdAndUpdate(userId, { verificationStatus: "pending" });
+    await User.findByIdAndUpdate(userId, { 
+      verificationStatus: "verified",
+      verificationLevel: "business" 
+    });
 
     res.status(201).json({ success: true, data: { request: newRequest } });
   },

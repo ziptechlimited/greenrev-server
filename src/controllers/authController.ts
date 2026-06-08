@@ -64,6 +64,60 @@ function clearAuthCookies(res: Response) {
   res.clearCookie("csrf_token", { ...csrfCookieOptions() });
 }
 
+export async function adminRegister(req: Request, res: Response) {
+  const { email, password, name, activationCode } =
+    req.body as Record<string, unknown>;
+
+  if (typeof email !== "string" || !emailRegex.test(email)) {
+    throw new ApiError(400, "INVALID_EMAIL", "Invalid email");
+  }
+  if (typeof password !== "string") {
+    throw new ApiError(400, "INVALID_PASSWORD", "Invalid password");
+  }
+  if (typeof activationCode !== "string" || activationCode !== "GREENREV") {
+    throw new ApiError(403, "INVALID_ACTIVATION_CODE", "Invalid activation code");
+  }
+  if (name !== undefined && name !== null && typeof name !== "string") {
+    throw new ApiError(400, "INVALID_NAME", "Invalid name");
+  }
+
+  try {
+    assertStrongPassword(password);
+  } catch (e) {
+    throw new ApiError(400, "WEAK_PASSWORD", (e as Error).message);
+  }
+
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    throw new ApiError(409, "EMAIL_IN_USE", "Email already in use");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const user = await User.create({
+    email: email.toLowerCase(),
+    passwordHash,
+    role: "admin" as UserRole,
+    name: typeof name === "string" ? name : null,
+    isEmailVerified: false,
+  });
+
+  const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
+  await AuthToken.create({
+    userId: user._id,
+    type: "email_verify",
+    tokenHash: sha256Base64Url(verifyPin),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+
+  await sendEmail({
+    to: user.email,
+    subject: "Verify your admin email",
+    html: getVerificationEmailTemplate(verifyPin),
+  });
+
+  return sendSuccess(res, 201, { user: publicUser(user) });
+}
+
 export async function register(req: Request, res: Response) {
   const { email, password, role, name, companyName, garageName } =
     req.body as Record<string, unknown>;
