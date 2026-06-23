@@ -22,13 +22,16 @@ export const env = {
   nodeEnv: optional("NODE_ENV") ?? "development",
   port: toInt(optional("PORT"), 4000),
   mongoUri: required("MONGO_URI"),
-  frontendUrl: required("FRONTEND_URL"),
+  frontendUrls: required("FRONTEND_URL"),
   accessTokenSecret: required("JWT_ACCESS_SECRET"),
   accessTokenTtlSeconds: toInt(optional("JWT_ACCESS_TTL_SECONDS"), 900),
   refreshTokenTtlDays: toInt(optional("REFRESH_TOKEN_TTL_DAYS"), 7),
   bcryptSaltRounds: toInt(optional("BCRYPT_SALT_ROUNDS"), 12),
   cookieDomain: optional("COOKIE_DOMAIN"),
-  cookieSameSite: (optional("COOKIE_SAMESITE") ?? "lax") as "lax" | "strict" | "none",
+  cookieSameSite: (optional("COOKIE_SAMESITE") ?? "lax") as
+    | "lax"
+    | "strict"
+    | "none",
   oauthStateSecret: required("OAUTH_STATE_SECRET"),
   googleClientId: optional("GOOGLE_CLIENT_ID"),
   googleClientSecret: optional("GOOGLE_CLIENT_SECRET"),
