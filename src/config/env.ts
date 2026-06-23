@@ -22,7 +22,7 @@ export const env = {
   nodeEnv: optional("NODE_ENV") ?? "development",
   port: toInt(optional("PORT"), 4000),
   mongoUri: required("MONGO_URI"),
-  frontendUrls: required("FRONTEND_URL"),
+  frontendUrls: required("FRONTEND_URLS").split(","),
   accessTokenSecret: required("JWT_ACCESS_SECRET"),
   accessTokenTtlSeconds: toInt(optional("JWT_ACCESS_TTL_SECONDS"), 900),
   refreshTokenTtlDays: toInt(optional("REFRESH_TOKEN_TTL_DAYS"), 7),
