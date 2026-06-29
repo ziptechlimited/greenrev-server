@@ -9,7 +9,7 @@ const mongodb_memory_server_1 = require("mongodb-memory-server");
 const crypto_1 = require("../utils/crypto");
 const AuthToken_1 = require("../models/AuthToken");
 const User_1 = require("../models/User");
-let mongo;
+let mongo = null;
 function cookieValue(setCookieHeader, name) {
     if (!setCookieHeader)
         return undefined;
@@ -27,11 +27,12 @@ describe("auth", () => {
         process.env.JWT_ACCESS_SECRET = "test_access_secret";
         process.env.OAUTH_STATE_SECRET = "test_oauth_state_secret";
         await mongoose_1.default.connect(process.env.MONGO_URI);
-    });
+    }, 30_000);
     afterAll(async () => {
         await mongoose_1.default.disconnect();
-        await mongo.stop();
-    });
+        if (mongo)
+            await mongo.stop();
+    }, 30_000);
     it("register -> verify email -> login -> me -> refresh", async () => {
         const { createApp } = require("../app");
         const app = createApp();

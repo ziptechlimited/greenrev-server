@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.adminRegister = adminRegister;
 exports.register = register;
 exports.login = login;
 exports.me = me;
@@ -23,6 +24,7 @@ const jwt_1 = require("../utils/jwt");
 const cookies_1 = require("../utils/cookies");
 const tokenService_1 = require("../services/tokenService");
 const emailService_1 = require("../services/emailService");
+const emailTemplates_1 = require("../utils/emailTemplates");
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function publicUser(user) {
     return {
@@ -53,6 +55,52 @@ function clearAuthCookies(res) {
     res.clearCookie("access_token", { ...(0, cookies_1.baseCookieOptions)() });
     res.clearCookie("refresh_token", { ...(0, cookies_1.baseCookieOptions)() });
     res.clearCookie("csrf_token", { ...(0, cookies_1.csrfCookieOptions)() });
+}
+async function adminRegister(req, res) {
+    const { email, password, name, activationCode } = req.body;
+    if (typeof email !== "string" || !emailRegex.test(email)) {
+        throw new errors_1.ApiError(400, "INVALID_EMAIL", "Invalid email");
+    }
+    if (typeof password !== "string") {
+        throw new errors_1.ApiError(400, "INVALID_PASSWORD", "Invalid password");
+    }
+    if (typeof activationCode !== "string" || activationCode !== "GREENREV") {
+        throw new errors_1.ApiError(403, "INVALID_ACTIVATION_CODE", "Invalid activation code");
+    }
+    if (name !== undefined && name !== null && typeof name !== "string") {
+        throw new errors_1.ApiError(400, "INVALID_NAME", "Invalid name");
+    }
+    try {
+        (0, password_1.assertStrongPassword)(password);
+    }
+    catch (e) {
+        throw new errors_1.ApiError(400, "WEAK_PASSWORD", e.message);
+    }
+    const existing = await User_1.User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+        throw new errors_1.ApiError(409, "EMAIL_IN_USE", "Email already in use");
+    }
+    const passwordHash = await (0, password_1.hashPassword)(password);
+    const user = await User_1.User.create({
+        email: email.toLowerCase(),
+        passwordHash,
+        role: "admin",
+        name: typeof name === "string" ? name : null,
+        isEmailVerified: false,
+    });
+    const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
+    await AuthToken_1.AuthToken.create({
+        userId: user._id,
+        type: "email_verify",
+        tokenHash: (0, crypto_1.sha256Base64Url)(verifyPin),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+    await (0, emailService_1.sendEmail)({
+        to: user.email,
+        subject: "Verify your admin email",
+        html: (0, emailTemplates_1.getVerificationEmailTemplate)(verifyPin),
+    });
+    return (0, apiResponse_1.sendSuccess)(res, 201, { user: publicUser(user) });
 }
 async function register(req, res) {
     const { email, password, role, name, companyName, garageName } = req.body;
@@ -111,18 +159,17 @@ async function register(req, res) {
         garageName: typeof garageName === "string" ? garageName : null,
         isEmailVerified: false,
     });
-    const verifyToken = (0, crypto_1.randomToken)(48);
+    const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
     await AuthToken_1.AuthToken.create({
         userId: user._id,
         type: "email_verify",
-        tokenHash: (0, crypto_1.sha256Base64Url)(verifyToken),
+        tokenHash: (0, crypto_1.sha256Base64Url)(verifyPin),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
-    const verifyUrl = `${env_1.env.frontendUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(verifyToken)}`;
     await (0, emailService_1.sendEmail)({
         to: user.email,
         subject: "Verify your email",
-        html: `<p>Verify your email address by clicking the link below:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+        html: (0, emailTemplates_1.getVerificationEmailTemplate)(verifyPin),
     });
     return (0, apiResponse_1.sendSuccess)(res, 201, { user: publicUser(user) });
 }
@@ -189,18 +236,21 @@ async function logout(req, res) {
     return (0, apiResponse_1.sendSuccess)(res, 200, { ok: true });
 }
 async function verifyEmail(req, res) {
-    const { token } = req.body;
-    if (typeof token !== "string" || token.length < 20) {
-        throw new errors_1.ApiError(400, "INVALID_TOKEN", "Invalid token");
+    const { pin, email } = req.body;
+    if (typeof pin !== "string" || pin.length !== 6) {
+        throw new errors_1.ApiError(400, "INVALID_PIN", "Invalid PIN");
     }
-    const tokenHash = (0, crypto_1.sha256Base64Url)(token);
-    const record = await AuthToken_1.AuthToken.findOne({ tokenHash, type: "email_verify" });
-    if (!record || record.usedAt || record.expiresAt.getTime() <= Date.now()) {
-        throw new errors_1.ApiError(400, "INVALID_TOKEN", "Invalid token");
+    if (typeof email !== "string" || !emailRegex.test(email)) {
+        throw new errors_1.ApiError(400, "INVALID_EMAIL", "Invalid email");
     }
-    const user = await User_1.User.findById(record.userId);
+    const user = await User_1.User.findOne({ email: email.toLowerCase() });
     if (!user) {
-        throw new errors_1.ApiError(400, "INVALID_TOKEN", "Invalid token");
+        throw new errors_1.ApiError(400, "INVALID_PIN", "Invalid PIN or email");
+    }
+    const tokenHash = (0, crypto_1.sha256Base64Url)(pin);
+    const record = await AuthToken_1.AuthToken.findOne({ tokenHash, type: "email_verify", userId: user._id });
+    if (!record || record.usedAt || record.expiresAt.getTime() <= Date.now()) {
+        throw new errors_1.ApiError(400, "INVALID_PIN", "Invalid PIN");
     }
     user.isEmailVerified = true;
     await user.save();
@@ -220,18 +270,17 @@ async function resendVerification(req, res) {
     if (user.isEmailVerified) {
         return (0, apiResponse_1.sendSuccess)(res, 200, { ok: true });
     }
-    const verifyToken = (0, crypto_1.randomToken)(48);
+    const verifyPin = Math.floor(100000 + Math.random() * 900000).toString();
     await AuthToken_1.AuthToken.create({
         userId: user._id,
         type: "email_verify",
-        tokenHash: (0, crypto_1.sha256Base64Url)(verifyToken),
+        tokenHash: (0, crypto_1.sha256Base64Url)(verifyPin),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
-    const verifyUrl = `${env_1.env.frontendUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(verifyToken)}`;
     await (0, emailService_1.sendEmail)({
         to: user.email,
         subject: "Verify your email",
-        html: `<p>Verify your email address by clicking the link below:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+        html: (0, emailTemplates_1.getVerificationEmailTemplate)(verifyPin),
     });
     return (0, apiResponse_1.sendSuccess)(res, 200, { ok: true });
 }
@@ -255,7 +304,7 @@ async function forgotPassword(req, res) {
     await (0, emailService_1.sendEmail)({
         to: user.email,
         subject: "Reset your password",
-        html: `<p>Reset your password using the link below (expires in 1 hour):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+        html: (0, emailTemplates_1.getPasswordResetTemplate)(resetUrl),
     });
     return (0, apiResponse_1.sendSuccess)(res, 200, { ok: true });
 }

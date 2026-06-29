@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const mechanicController_1 = require("../controllers/mechanicController");
+const router = (0, express_1.Router)();
+router.get("/mechanic/profile", auth_1.requireAuth, (0, auth_1.requireRole)(["mechanic"]), mechanicController_1.getProfile);
+router.patch("/mechanic/profile", auth_1.requireAuth, (0, auth_1.requireRole)(["mechanic"]), mechanicController_1.updateProfile);
+router.patch("/mechanic/location", auth_1.requireAuth, (0, auth_1.requireRole)(["mechanic"]), mechanicController_1.updateLocation);
+exports.default = router;

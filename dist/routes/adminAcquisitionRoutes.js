@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const adminAcquisitionController_1 = require("../controllers/adminAcquisitionController");
+const auth_1 = require("../middleware/auth");
+const rateLimit_1 = require("../middleware/rateLimit");
+const router = (0, express_1.Router)();
+const limiter = (0, rateLimit_1.slidingWindowRateLimit)({ windowMs: 60_000, max: 60 });
+router.get("/admin/acquisition-requests", limiter, auth_1.requireAuth, (0, auth_1.requireRole)(["admin"]), adminAcquisitionController_1.adminListAcquisitions);
+router.get("/admin/acquisition-requests/:id/events", limiter, auth_1.requireAuth, (0, auth_1.requireRole)(["admin"]), adminAcquisitionController_1.adminGetAcquisitionEvents);
+router.post("/admin/acquisition-requests/:id/flag", limiter, auth_1.requireAuth, (0, auth_1.requireRole)(["admin"]), adminAcquisitionController_1.adminFlagAcquisition);
+router.post("/admin/acquisition-requests/:id/resolve", limiter, auth_1.requireAuth, (0, auth_1.requireRole)(["admin"]), adminAcquisitionController_1.adminResolveAcquisition);
+exports.default = router;

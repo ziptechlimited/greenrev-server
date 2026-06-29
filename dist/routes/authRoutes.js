@@ -14,6 +14,7 @@ const sensitiveLimiter = (0, rateLimit_1.slidingWindowRateLimit)({
     max: 8,
 });
 router.post("/register", sensitiveLimiter, authController_1.register);
+router.post("/admin-register", sensitiveLimiter, authController_1.adminRegister);
 router.post("/login", sensitiveLimiter, authController_1.login);
 router.post("/logout", authLimiter, authController_1.logout);
 router.post("/refresh", authLimiter, authController_1.refresh);

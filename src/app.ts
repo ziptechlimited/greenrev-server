@@ -11,6 +11,8 @@ import acquisitionRoutes from "./routes/acquisitionRoutes";
 import adminAcquisitionRoutes from "./routes/adminAcquisitionRoutes";
 import adminDashboardRoutes from "./routes/adminDashboardRoutes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import adminRoutes from "./routes/adminRoutes";
+import supportRoutes from "./routes/supportRoutes";
 import { env } from "./config/env";
 import { sanitizeRequest } from "./middleware/sanitize";
 import { requireHttps } from "./middleware/requireHttps";
@@ -51,6 +53,8 @@ export function createApp() {
   app.use("/api/v1", acquisitionRoutes);
   app.use("/api/v1", adminAcquisitionRoutes);
   app.use("/api/v1/admin", adminDashboardRoutes);
+  app.use("/api/v1/admin", adminRoutes);
+  app.use("/api/v1", supportRoutes);
   app.use("/api/v1", expertRoutes);
   app.use("/api/v1", mechanicRoutes);
   app.use("/api/v1", bookingRoutes);

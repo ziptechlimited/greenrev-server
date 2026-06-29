@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAuth = requireAuth;
 exports.requireRole = requireRole;
+exports.requireVerificationLevel = requireVerificationLevel;
 const errors_1 = require("../utils/errors");
 const jwt_1 = require("../utils/jwt");
 const User_1 = require("../models/User");
@@ -36,6 +37,9 @@ async function requireAuth(req, _res, next) {
             role: user.role,
             name: user.name ?? null,
             isEmailVerified: Boolean(user.isEmailVerified),
+            isPhoneVerified: Boolean(user.isPhoneVerified),
+            verificationLevel: user.verificationLevel || "basic",
+            verificationStatus: user.verificationStatus || "unverified",
         };
         next();
     }
@@ -52,6 +56,20 @@ function requireRole(roles) {
         }
         if (!roles.includes(role)) {
             next(new errors_1.ApiError(403, "FORBIDDEN", "Insufficient permissions"));
+            return;
+        }
+        next();
+    };
+}
+function requireVerificationLevel(levels) {
+    return (req, _res, next) => {
+        const level = req.user?.verificationLevel;
+        if (!level) {
+            next(new errors_1.ApiError(401, "UNAUTHENTICATED", "Authentication required"));
+            return;
+        }
+        if (!levels.includes(level)) {
+            next(new errors_1.ApiError(403, "FORBIDDEN", "Insufficient verification level"));
             return;
         }
         next();

@@ -9,9 +9,16 @@ import type { CustomReq } from "../types/auth";
 export async function listUsers(req: CustomReq, res: Response) {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
+  const role = req.query.role as string;
   const skip = (page - 1) * limit;
 
+  const matchStage: any = {};
+  if (role) {
+    matchStage.role = role;
+  }
+
   const { users, total } = await User.aggregate([
+    { $match: matchStage },
     { $facet: {
       users: [{ $skip: skip }, { $limit: limit }],
       total: [{ $count: "count" }]
