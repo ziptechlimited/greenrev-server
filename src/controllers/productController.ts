@@ -258,3 +258,49 @@ export async function deleteProduct(req: CustomReq, res: Response) {
     });
   }
 }
+
+export async function bulkDeleteProducts(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, {
+        code: "UNAUTHORIZED",
+        message: "Authentication required",
+      });
+    }
+
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return sendError(res, 400, {
+        code: "VALIDATION_ERROR",
+        message: "ids must be a non-empty array of product IDs",
+      });
+    }
+
+    if (ids.length > 100) {
+      return sendError(res, 400, {
+        code: "VALIDATION_ERROR",
+        message: "Cannot delete more than 100 products at once",
+      });
+    }
+
+    // Build query — admins can delete any product; vendors only their own
+    const query: any =
+      req.user.role === "admin"
+        ? { _id: { $in: ids } }
+        : { _id: { $in: ids }, vendorId: req.user.id };
+
+    const result = await Product.deleteMany(query);
+
+    return sendSuccess(res, 200, {
+      message: `${result.deletedCount} product(s) deleted successfully`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Error bulk deleting products:", error);
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Failed to bulk delete products",
+    });
+  }
+}
