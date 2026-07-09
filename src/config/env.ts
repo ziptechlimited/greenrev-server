@@ -41,4 +41,5 @@ export const env = {
   smtpUser: optional("SMTP_USER"),
   smtpPass: optional("SMTP_PASS"),
   smtpFrom: optional("SMTP_FROM"),
+  resendApiKey: optional("RESEND_API_KEY"),
 };
