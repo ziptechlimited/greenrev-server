@@ -249,7 +249,7 @@ export async function me(req: CustomReq, res: Response) {
   if (!req.user) {
     throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
   }
-  return sendSuccess(res, 200, { user: req.user });
+  return sendSuccess(res, 200, { user: req.user, csrfToken: req.cookies?.csrf_token });
 }
 
 export async function refresh(req: CustomReq, res: Response) {
