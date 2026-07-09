@@ -33,9 +33,6 @@ exports.env = {
     googleClientId: optional("GOOGLE_CLIENT_ID"),
     googleClientSecret: optional("GOOGLE_CLIENT_SECRET"),
     googleRedirectUri: optional("GOOGLE_REDIRECT_URI"),
-    smtpHost: optional("SMTP_HOST"),
-    smtpPort: toInt(optional("SMTP_PORT"), 465),
-    smtpUser: optional("SMTP_USER"),
-    smtpPass: optional("SMTP_PASS"),
-    smtpFrom: optional("SMTP_FROM"),
+    emailFrom: optional("EMAIL_FROM") ?? optional("SMTP_FROM"),
+    resendApiKey: optional("RESEND_API_KEY"),
 };

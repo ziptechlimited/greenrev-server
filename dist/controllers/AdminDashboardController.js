@@ -13,8 +13,14 @@ const apiResponse_1 = require("../utils/apiResponse");
 async function listUsers(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
+    const role = req.query.role;
     const skip = (page - 1) * limit;
+    const matchStage = {};
+    if (role) {
+        matchStage.role = role;
+    }
     const { users, total } = await User_1.User.aggregate([
+        { $match: matchStage },
         { $facet: {
                 users: [{ $skip: skip }, { $limit: limit }],
                 total: [{ $count: "count" }]

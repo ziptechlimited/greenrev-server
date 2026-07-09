@@ -204,7 +204,7 @@ async function me(req, res) {
     if (!req.user) {
         throw new errors_1.ApiError(401, "UNAUTHENTICATED", "Authentication required");
     }
-    return (0, apiResponse_1.sendSuccess)(res, 200, { user: req.user });
+    return (0, apiResponse_1.sendSuccess)(res, 200, { user: req.user, csrfToken: req.cookies?.csrf_token });
 }
 async function refresh(req, res) {
     const refreshToken = req.cookies?.refresh_token;

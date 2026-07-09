@@ -6,6 +6,7 @@ exports.getAllProducts = getAllProducts;
 exports.getProduct = getProduct;
 exports.updateProduct = updateProduct;
 exports.deleteProduct = deleteProduct;
+exports.bulkDeleteProducts = bulkDeleteProducts;
 const Product_1 = require("../models/Product");
 const User_1 = require("../models/User");
 const apiResponse_1 = require("../utils/apiResponse");
@@ -213,6 +214,45 @@ async function deleteProduct(req, res) {
         return (0, apiResponse_1.sendError)(res, 500, {
             code: "INTERNAL_ERROR",
             message: "Failed to delete product",
+        });
+    }
+}
+async function bulkDeleteProducts(req, res) {
+    try {
+        if (!req.user) {
+            return (0, apiResponse_1.sendError)(res, 401, {
+                code: "UNAUTHORIZED",
+                message: "Authentication required",
+            });
+        }
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return (0, apiResponse_1.sendError)(res, 400, {
+                code: "VALIDATION_ERROR",
+                message: "ids must be a non-empty array of product IDs",
+            });
+        }
+        if (ids.length > 100) {
+            return (0, apiResponse_1.sendError)(res, 400, {
+                code: "VALIDATION_ERROR",
+                message: "Cannot delete more than 100 products at once",
+            });
+        }
+        // Build query — admins can delete any product; vendors only their own
+        const query = req.user.role === "admin"
+            ? { _id: { $in: ids } }
+            : { _id: { $in: ids }, vendorId: req.user.id };
+        const result = await Product_1.Product.deleteMany(query);
+        return (0, apiResponse_1.sendSuccess)(res, 200, {
+            message: `${result.deletedCount} product(s) deleted successfully`,
+            deletedCount: result.deletedCount,
+        });
+    }
+    catch (error) {
+        console.error("Error bulk deleting products:", error);
+        return (0, apiResponse_1.sendError)(res, 500, {
+            code: "INTERNAL_ERROR",
+            message: "Failed to bulk delete products",
         });
     }
 }

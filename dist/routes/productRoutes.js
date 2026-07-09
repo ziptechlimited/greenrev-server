@@ -12,6 +12,7 @@ const productLimiter = (0, rateLimit_1.slidingWindowRateLimit)({
 router.post("/products", productLimiter, auth_1.requireAuth, productController_1.createProduct);
 router.get("/products", productLimiter, productController_1.getAllProducts);
 router.get("/products/vendor", productLimiter, auth_1.requireAuth, productController_1.getVendorProducts);
+router.delete("/products/bulk", productLimiter, auth_1.requireAuth, productController_1.bulkDeleteProducts);
 router.get("/products/:id", productLimiter, productController_1.getProduct);
 router.put("/products/:id", productLimiter, auth_1.requireAuth, productController_1.updateProduct);
 router.delete("/products/:id", productLimiter, auth_1.requireAuth, productController_1.deleteProduct);

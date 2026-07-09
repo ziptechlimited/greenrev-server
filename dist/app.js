@@ -19,8 +19,6 @@ const adminDashboardRoutes_1 = __importDefault(require("./routes/adminDashboardR
 const errorHandler_1 = require("./middleware/errorHandler");
 const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 const supportRoutes_1 = __importDefault(require("./routes/supportRoutes"));
-const cmsRoutes_1 = __importDefault(require("./routes/cmsRoutes"));
-const settingsRoutes_1 = __importDefault(require("./routes/settingsRoutes"));
 const env_1 = require("./config/env");
 const sanitize_1 = require("./middleware/sanitize");
 const requireHttps_1 = require("./middleware/requireHttps");
@@ -55,8 +53,6 @@ function createApp() {
     app.use("/api/v1/admin", adminDashboardRoutes_1.default);
     app.use("/api/v1/admin", adminRoutes_1.default);
     app.use("/api/v1", supportRoutes_1.default);
-    app.use("/api/v1", cmsRoutes_1.default);
-    app.use("/api/v1", settingsRoutes_1.default);
     app.use("/api/v1", expertRoutes_1.default);
     app.use("/api/v1", mechanicRoutes_1.default);
     app.use("/api/v1", bookingRoutes_1.default);
