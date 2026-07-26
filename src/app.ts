@@ -22,6 +22,7 @@ import mechanicRoutes from "./routes/mechanicRoutes";
 import bookingRoutes from "./routes/bookingRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import { verificationRoutes } from "./routes/verificationRoutes";
+import inquiryRoutes from "./routes/inquiryRoutes";
 
 export function createApp() {
   const app = express();
@@ -60,6 +61,7 @@ export function createApp() {
   app.use("/api/v1", bookingRoutes);
   app.use("/api/v1", uploadRoutes);
   app.use("/api/v1/verification", verificationRoutes);
+  app.use("/api/v1", inquiryRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

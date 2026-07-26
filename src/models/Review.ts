@@ -5,8 +5,9 @@ const reviewSchema = new Schema(
     acquisitionRequestId: {
       type: Schema.Types.ObjectId,
       ref: "AcquisitionRequest",
-      required: true,
-      unique: true, // One review per transaction
+      required: false,
+      unique: true,
+      sparse: true,
       index: true,
     },
     customerId: {

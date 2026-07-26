@@ -109,6 +109,11 @@ export async function adminRegister(req: Request, res: Response) {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
 
+  console.log(`\n========== OTP GENERATED ==========`);
+  console.log(`Email: ${user.email}`);
+  console.log(`OTP: ${verifyPin}`);
+  console.log(`===================================\n`);
+
   await sendEmail({
     to: user.email,
     subject: "Verify your admin email",
@@ -198,6 +203,11 @@ export async function register(req: Request, res: Response) {
     tokenHash: sha256Base64Url(verifyPin),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
+
+  console.log(`\n========== OTP GENERATED ==========`);
+  console.log(`Email: ${user.email}`);
+  console.log(`OTP: ${verifyPin}`);
+  console.log(`===================================\n`);
 
   await sendEmail({
     to: user.email,
@@ -341,6 +351,11 @@ export async function resendVerification(req: Request, res: Response) {
     tokenHash: sha256Base64Url(verifyPin),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
+
+  console.log(`\n========== OTP GENERATED ==========`);
+  console.log(`Email: ${user.email}`);
+  console.log(`OTP: ${verifyPin}`);
+  console.log(`===================================\n`);
 
   await sendEmail({
     to: user.email,

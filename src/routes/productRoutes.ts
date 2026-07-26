@@ -8,6 +8,7 @@ import {
   deleteProduct,
   bulkDeleteProducts,
 } from "../controllers/productController";
+import { createProductReview, getProductReviews } from "../controllers/reviewController";
 
 import { requireAuth } from "../middleware/auth";
 import { slidingWindowRateLimit } from "../middleware/rateLimit";
@@ -27,5 +28,7 @@ router.get("/products/:id", productLimiter, getProduct);
 router.put("/products/:id", productLimiter, requireAuth, updateProduct);
 router.delete("/products/:id", productLimiter, requireAuth, deleteProduct);
 
+router.post("/products/:id/reviews", productLimiter, requireAuth, createProductReview);
+router.get("/products/:id/reviews", productLimiter, getProductReviews);
 
 export default router;

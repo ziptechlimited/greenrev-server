@@ -5,9 +5,7 @@ import { sendSuccess, sendError } from "../utils/apiResponse";
 export async function getExperts(req: Request, res: Response) {
   try {
     const experts = await User.find({ 
-      role: "mechanic",
-      city: { $ne: null },
-      lat: { $ne: null }
+      role: "mechanic"
     })
       .select("-passwordHash -__v")
       .lean();

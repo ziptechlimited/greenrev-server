@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { Review } from "../models/Review";
 import { AcquisitionRequest } from "../models/AcquisitionRequest";
 import { User } from "../models/User";
+import { Product } from "../models/Product";
 import type { CustomReq } from "../types/auth";
 import { sendSuccess, sendError } from "../utils/apiResponse";
 
@@ -86,5 +87,76 @@ export async function getVendorReviews(req: CustomReq, res: Response) {
   } catch (error) {
     console.error("Error fetching vendor reviews:", error);
     return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to fetch reviews" });
+  }
+}
+
+// ─── Public: Get product reviews ──────────────────────────────────────────────
+export async function getProductReviews(req: CustomReq, res: Response) {
+  try {
+    const { id: productId } = req.params;
+
+    const reviews = await Review.find({ productId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const avgRating =
+      reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : 0;
+
+    return sendSuccess(res, 200, {
+      reviews,
+      averageRating: Math.round(avgRating * 10) / 10,
+      totalReviews: reviews.length,
+    });
+  } catch (error) {
+    console.error("Error fetching product reviews:", error);
+    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to fetch reviews" });
+  }
+}
+
+// ─── Customer: Submit a product review ─────────────────────────────────────────
+export async function createProductReview(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, { code: "UNAUTHORIZED", message: "Authentication required" });
+    }
+
+    const { id: productId } = req.params;
+    const { rating, comment } = req.body;
+
+    if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
+      return sendError(res, 400, { code: "VALIDATION_ERROR", message: "Rating must be a number between 1 and 5" });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return sendError(res, 404, { code: "NOT_FOUND", message: "Product not found" });
+    }
+
+    // Check for existing product review by this customer (if we only allow 1 review per product per user)
+    const existingReview = await Review.findOne({ productId, customerId: req.user.id });
+    if (existingReview) {
+      return sendError(res, 409, { code: "DUPLICATE_REVIEW", message: "You have already reviewed this product" });
+    }
+
+    const customer = await User.findById(req.user.id).select("name").lean();
+
+    const review = new Review({
+      customerId: req.user.id,
+      vendorId: product.vendorId,
+      productId: product._id,
+      rating,
+      comment: comment || null,
+      customerName: (customer as any)?.name || "Customer",
+      productName: product.name,
+    });
+
+    await review.save();
+
+    return sendSuccess(res, 201, { review });
+  } catch (error) {
+    console.error("Error creating product review:", error);
+    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to submit review" });
   }
 }
