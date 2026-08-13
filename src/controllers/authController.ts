@@ -252,7 +252,7 @@ export async function login(req: Request, res: Response) {
 
   setAuthCookies(res, { accessToken, refreshToken, csrfToken });
 
-  return sendSuccess(res, 200, { user: publicUser(user), csrfToken });
+  return sendSuccess(res, 200, { user: publicUser(user), csrfToken, accessToken });
 }
 
 export async function me(req: CustomReq, res: Response) {
