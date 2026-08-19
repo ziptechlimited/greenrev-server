@@ -5,6 +5,7 @@ import { sendSuccess } from "../utils/apiResponse";
 import type { CustomReq } from "../types/auth";
 import { uploadImage } from "../utils/cloudinary";
 import { ExpertMessage } from "../models/ExpertMessage";
+import { sendEmail } from "../services/emailService";
 
 export async function getProfile(req: CustomReq, res: Response) {
   if (!req.user) {
@@ -122,4 +123,59 @@ export async function getExpertMessages(req: CustomReq, res: Response) {
     .lean();
 
   return sendSuccess(res, 200, { messages });
+}
+
+export async function replyToExpertMessage(req: CustomReq, res: Response) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+
+  const messageId = req.params.id;
+  const { reply } = req.body;
+
+  if (!reply || typeof reply !== "string" || !reply.trim()) {
+    throw new ApiError(400, "INVALID_INPUT", "Reply content is required");
+  }
+
+  const message = await ExpertMessage.findById(messageId);
+  if (!message) {
+    throw new ApiError(404, "MESSAGE_NOT_FOUND", "Message not found");
+  }
+
+  if (message.expertId.toString() !== req.user.id) {
+    throw new ApiError(403, "FORBIDDEN", "Not authorized to reply to this message");
+  }
+
+  message.reply = reply.trim();
+  message.replyDate = new Date();
+  message.status = "REPLIED";
+
+  await message.save();
+
+  // Find the expert's name
+  const expert = await User.findById(req.user.id).select("name email");
+  const expertName = expert?.name || "An Expert";
+
+  // Send an email to the user
+  const emailHtml = `
+    <h2>You received a reply from ${expertName}!</h2>
+    <p>They responded to the message you sent on GreenRev.</p>
+    <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Your Original Message:</strong></p>
+      <p style="color: #666;">${message.message}</p>
+    </div>
+    <div style="background: #eef8ee; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>${expertName}'s Reply:</strong></p>
+      <p>${message.reply}</p>
+    </div>
+    <p>Log in to GreenRev to view all your messages.</p>
+  `;
+
+  await sendEmail({
+    to: message.senderEmail,
+    subject: `Reply from ${expertName} - GreenRev`,
+    html: emailHtml,
+  }).catch(err => console.error("Failed to send expert reply email:", err));
+
+  return sendSuccess(res, 200, { message });
 }

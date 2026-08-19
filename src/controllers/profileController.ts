@@ -3,6 +3,7 @@ import { User } from "../models/User";
 import { sendSuccess, sendError } from "../utils/apiResponse";
 import type { CustomReq } from "../types/auth";
 import { uploadImage } from "../utils/cloudinary";
+import { ExpertMessage } from "../models/ExpertMessage";
 
 export async function getProfile(req: CustomReq, res: Response) {
   try {
@@ -58,6 +59,30 @@ export async function updateProfile(req: CustomReq, res: Response) {
     return sendSuccess(res, 200, { user: updatedUser });
   } catch (error) {
     console.error("Update profile error:", error);
+    return sendError(res, 500, {
+      code: "INTERNAL_ERROR",
+      message: "Server error",
+    });
+  }
+}
+
+export async function getUserMessages(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, {
+        code: "UNAUTHENTICATED",
+        message: "Authentication required",
+      });
+    }
+
+    const messages = await ExpertMessage.find({ senderId: req.user.id })
+      .populate("expertId", "name email profileImage")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return sendSuccess(res, 200, { messages });
+  } catch (error) {
+    console.error("Get user messages error:", error);
     return sendError(res, 500, {
       code: "INTERNAL_ERROR",
       message: "Server error",
