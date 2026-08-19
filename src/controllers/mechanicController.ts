@@ -4,6 +4,7 @@ import { ApiError } from "../utils/errors";
 import { sendSuccess } from "../utils/apiResponse";
 import type { CustomReq } from "../types/auth";
 import { uploadImage } from "../utils/cloudinary";
+import { ExpertMessage } from "../models/ExpertMessage";
 
 export async function getProfile(req: CustomReq, res: Response) {
   if (!req.user) {
@@ -109,4 +110,16 @@ export async function updateLocation(req: CustomReq, res: Response) {
       lng: user.lng ?? 0,
     },
   });
+}
+
+export async function getExpertMessages(req: CustomReq, res: Response) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+
+  const messages = await ExpertMessage.find({ expertId: req.user.id })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return sendSuccess(res, 200, { messages });
 }

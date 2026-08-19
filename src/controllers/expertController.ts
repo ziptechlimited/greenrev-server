@@ -1,8 +1,10 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User";
 import { ExpertReview } from "../models/ExpertReview";
+import { ExpertMessage } from "../models/ExpertMessage";
 import { sendSuccess, sendError } from "../utils/apiResponse";
 import type { CustomReq } from "../types/auth";
+import { sendEmail } from "../services/emailService";
 
 export async function getExperts(req: Request, res: Response) {
   try {
@@ -106,5 +108,73 @@ export async function createExpertReview(req: CustomReq, res: Response) {
   } catch (error) {
     console.error("Create expert review error:", error);
     return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to save review" });
+  }
+}
+
+export async function createExpertMessage(req: CustomReq, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, 401, { code: "UNAUTHENTICATED", message: "Login required to send a message" });
+    }
+
+    const { id: expertId } = req.params;
+    const { message } = req.body as { message?: string };
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return sendError(res, 400, { code: "INVALID_INPUT", message: "Message cannot be empty" });
+    }
+
+    const expert = await User.findById(expertId).lean();
+    if (!expert || expert.role !== "mechanic") {
+      return sendError(res, 404, { code: "NOT_FOUND", message: "Expert not found" });
+    }
+
+    const sender = await User.findById(req.user.id).lean();
+    if (!sender) {
+      return sendError(res, 404, { code: "NOT_FOUND", message: "Sender not found" });
+    }
+
+    const senderName = (sender.name as string | null) ?? (sender.email as string);
+    const senderEmail = sender.email as string;
+    const senderPhone = (sender.phone as string | undefined);
+
+    const expertMessage = await ExpertMessage.create({
+      expertId: expertId as string,
+      senderId: sender._id,
+      senderName,
+      senderEmail,
+      senderPhone,
+      message: message.trim(),
+    });
+
+    // Send email notification to expert
+    if (expert.email) {
+      const emailHtml = `
+        <h2>New Message from ${senderName}</h2>
+        <p>You have received a new message on your GreenRev expert profile.</p>
+        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>Message:</strong></p>
+          <p>${message.trim()}</p>
+        </div>
+        <p><strong>Contact Details:</strong></p>
+        <ul>
+          <li>Name: ${senderName}</li>
+          <li>Email: ${senderEmail}</li>
+          ${senderPhone ? `<li>Phone: ${senderPhone}</li>` : ''}
+        </ul>
+        <p>Log in to your expert dashboard to respond or manage your messages.</p>
+      `;
+
+      await sendEmail({
+        to: expert.email as string,
+        subject: `New Message from ${senderName} - GreenRev`,
+        html: emailHtml,
+      }).catch(err => console.error("Failed to send expert message email:", err));
+    }
+
+    return sendSuccess(res, 201, { message: expertMessage });
+  } catch (error) {
+    console.error("Create expert message error:", error);
+    return sendError(res, 500, { code: "INTERNAL_ERROR", message: "Failed to send message" });
   }
 }
