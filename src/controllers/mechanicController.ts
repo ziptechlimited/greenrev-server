@@ -21,6 +21,7 @@ export async function getProfile(req: CustomReq, res: Response) {
     profile: {
       name: user.name ?? "",
       bio: user.bio ?? "",
+      phone: user.phone ?? "",
       specialization: user.specialization ?? [],
       hourlyRate: user.hourlyRate ?? 0,
       city: user.city ?? "",
@@ -39,7 +40,7 @@ export async function updateProfile(req: CustomReq, res: Response) {
       throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
     }
 
-    const { name, bio, specialization, hourlyRate, profileImageBase64 } = req.body as Record<string, unknown>;
+    const { name, bio, phone, specialization, hourlyRate, profileImageBase64 } = req.body as Record<string, unknown>;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -48,6 +49,7 @@ export async function updateProfile(req: CustomReq, res: Response) {
 
     if (typeof name === "string") user.name = name;
     if (typeof bio === "string") user.bio = bio;
+    if (typeof phone === "string") user.phone = phone;
     if (Array.isArray(specialization)) {
       user.specialization = specialization.filter(s => typeof s === "string");
     }
@@ -67,6 +69,7 @@ export async function updateProfile(req: CustomReq, res: Response) {
       profile: {
         name: user.name ?? "",
         bio: user.bio ?? "",
+        phone: user.phone ?? "",
         specialization: user.specialization ?? [],
         hourlyRate: user.hourlyRate ?? 0,
         profileImage: user.profileImage ?? null,
