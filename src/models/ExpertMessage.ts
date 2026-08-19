@@ -7,6 +7,8 @@ export interface IExpertMessage extends Document {
   senderEmail: string;
   senderPhone?: string;
   message: string;
+  reply?: string;
+  replyDate?: Date;
   status: "NEW" | "READ" | "REPLIED";
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +22,8 @@ const expertMessageSchema = new Schema<IExpertMessage>(
     senderEmail: { type: String, required: true },
     senderPhone: { type: String },
     message: { type: String, required: true },
+    reply: { type: String },
+    replyDate: { type: Date },
     status: {
       type: String,
       enum: ["NEW", "READ", "REPLIED"],
