@@ -9,10 +9,11 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB per file to support videos
   },
 });
 
-router.post("/upload", upload.single("file"), requireAuth, uploadProductMedia);
+// Support uploading up to 10 files (images + videos) in one request
+router.post("/upload", upload.array("files", 10), requireAuth, uploadProductMedia);
 
 export default router;

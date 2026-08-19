@@ -40,7 +40,11 @@ export async function uploadFile(
   folder: string = "greenrev_products",
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const resourceType = mimetype.startsWith("image/") ? "image" : "raw";
+    const resourceType = mimetype.startsWith("image/")
+      ? "image"
+      : mimetype.startsWith("video/")
+        ? "video"
+        : "raw";
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {

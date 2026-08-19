@@ -108,14 +108,47 @@ export async function getVendorProducts(req: CustomReq, res: Response) {
 
 export async function getAllProducts(req: CustomReq, res: Response) {
   try {
-    const { category } = req.query;
+    const { category, name, make, minPrice, maxPrice, minYear, maxYear, color, inStock } = req.query;
 
     const query: any = {};
+
     if (category && (category === "vehicle" || category === "part")) {
       query.category = category;
     }
 
-    const products = await Product.find({ ...query })
+    if (name && typeof name === "string" && name.trim()) {
+      // Case-insensitive substring match on product name
+      query.name = { $regex: name.trim(), $options: "i" };
+    }
+
+    if (make && typeof make === "string" && make.trim()) {
+      // Case-insensitive match on make/brand field
+      query.make = { $regex: make.trim(), $options: "i" };
+    }
+
+    // Price range: uses the numeric priceValue field
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.priceValue = {};
+      if (minPrice !== undefined) query.priceValue.$gte = Number(minPrice);
+      if (maxPrice !== undefined) query.priceValue.$lte = Number(maxPrice);
+    }
+
+    // Year range: uses the numeric year field
+    if (minYear !== undefined || maxYear !== undefined) {
+      query.year = {};
+      if (minYear !== undefined) query.year.$gte = Number(minYear);
+      if (maxYear !== undefined) query.year.$lte = Number(maxYear);
+    }
+
+    if (color && typeof color === "string" && color.trim()) {
+      query["color.name"] = { $regex: color.trim(), $options: "i" };
+    }
+
+    if (inStock !== undefined) {
+      query.inStock = inStock === "true";
+    }
+
+    const products = await Product.find(query)
       .sort({ createdAt: -1 })
       .lean();
 
@@ -128,6 +161,7 @@ export async function getAllProducts(req: CustomReq, res: Response) {
     });
   }
 }
+
 
 export async function getProduct(req: CustomReq, res: Response) {
   try {

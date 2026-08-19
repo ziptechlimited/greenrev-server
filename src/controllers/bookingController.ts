@@ -35,6 +35,18 @@ export async function createBooking(req: CustomReq, res: Response) {
   return sendSuccess(res, 201, { booking });
 }
 
+export async function getMyBookings(req: CustomReq, res: Response) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+
+  const bookings = await Booking.find({ userId: req.user.id })
+    .populate("mechanicId", "name email phone garageName")
+    .sort({ requestedDate: -1 });
+
+  return sendSuccess(res, 200, { bookings });
+}
+
 export async function getMechanicBookings(req: CustomReq, res: Response) {
   if (!req.user) {
     throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
