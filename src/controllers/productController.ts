@@ -176,7 +176,17 @@ export async function getProduct(req: CustomReq, res: Response) {
       });
     }
 
-    return sendSuccess(res, 200, product);
+    // Attach vendor contact info so the client can show a Call / Message button
+    const vendor = await User.findById(product.vendorId)
+      .select("phone")
+      .lean();
+
+    const productWithContact = {
+      ...product,
+      vendorPhone: vendor?.phone ?? null,
+    };
+
+    return sendSuccess(res, 200, productWithContact);
   } catch (error) {
     console.error("Error fetching product:", error);
     return sendError(res, 500, {
