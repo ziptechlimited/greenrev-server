@@ -12,6 +12,8 @@ import {
   resendVerification,
   resetPassword,
   verifyEmail,
+  mfaSetup,
+  mfaVerify,
 } from "../controllers/authController";
 import { requireAuth } from "../middleware/auth";
 import { slidingWindowRateLimit } from "../middleware/rateLimit";
@@ -43,6 +45,9 @@ router.post("/password/reset", authLimiter, resetPassword);
 
 router.get("/google", authLimiter, googleStart);
 router.get("/google/callback", authLimiter, googleCallback);
+
+router.post("/mfa/setup", authLimiter, requireAuth, mfaSetup);
+router.post("/mfa/verify", authLimiter, requireAuth, mfaVerify);
 
 export default router;
 

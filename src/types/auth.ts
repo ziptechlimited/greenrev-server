@@ -14,11 +14,14 @@ export type AuthenticatedUser = {
   isPhoneVerified: boolean;
   verificationLevel: VerificationLevel;
   verificationStatus: VerificationStatus;
+  permissions: string[];
+  sessionVersion?: number;
 };
 
 export type AccessTokenPayload = {
   sub: string;
   role: UserRole;
+  sessionVersion?: number;
 };
 
 export interface CustomReq extends Request {

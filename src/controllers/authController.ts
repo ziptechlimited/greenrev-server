@@ -610,3 +610,72 @@ export async function googleCallback(req: Request, res: Response) {
   );
   res.redirect(redirectUrl.toString());
 }
+
+import speakeasy from "speakeasy";
+import qrcode from "qrcode";
+
+export async function mfaSetup(req: CustomReq, res: Response) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw new ApiError(404, "USER_NOT_FOUND", "User not found");
+  }
+
+  if (user.mfaEnabled) {
+    throw new ApiError(400, "MFA_ALREADY_ENABLED", "MFA is already enabled on this account");
+  }
+
+  const secret = speakeasy.generateSecret({
+    name: `GreenRev BackOffice (${user.email})`,
+  });
+
+  if (!secret.base32 || !secret.otpauth_url) {
+    throw new ApiError(500, "MFA_SETUP_FAILED", "Failed to generate MFA secret");
+  }
+
+  user.mfaSecret = secret.base32;
+  await user.save();
+
+  const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+
+  return sendSuccess(res, 200, {
+    secret: secret.base32,
+    qrCodeUrl,
+  });
+}
+
+export async function mfaVerify(req: CustomReq, res: Response) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "Authentication required");
+  }
+
+  const { token } = req.body as { token?: string };
+  if (!token || typeof token !== "string" || token.length < 6) {
+    throw new ApiError(400, "INVALID_TOKEN", "MFA token is required");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user || !user.mfaSecret) {
+    throw new ApiError(400, "MFA_NOT_SETUP", "MFA is not set up on this account");
+  }
+
+  const verified = speakeasy.totp.verify({
+    secret: user.mfaSecret,
+    encoding: "base32",
+    token: token.trim(),
+  });
+
+  if (!verified) {
+    throw new ApiError(401, "INVALID_MFA_TOKEN", "Invalid MFA token");
+  }
+
+  if (!user.mfaEnabled) {
+    user.mfaEnabled = true;
+    await user.save();
+  }
+
+  return sendSuccess(res, 200, { ok: true });
+}

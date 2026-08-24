@@ -29,11 +29,35 @@ export async function requireAuth(
     }
 
     const payload = verifyAccessToken(token);
-    const user = await User.findById(payload.sub).lean();
+    const user = await User.findById(payload.sub).populate({
+      path: "assignedRole",
+      populate: { path: "permissions" }
+    }).populate("customPermissions").lean();
+
     if (!user) {
       next(new ApiError(401, "UNAUTHENTICATED", "Authentication required"));
       return;
     }
+
+    if (user.status !== "active") {
+      next(new ApiError(403, "FORBIDDEN", "Account suspended"));
+      return;
+    }
+
+    // Verify session version (optional, if payload includes it and user has it)
+    if (payload.sessionVersion !== undefined && user.sessionVersion !== undefined) {
+      if (payload.sessionVersion !== user.sessionVersion) {
+        next(new ApiError(401, "UNAUTHENTICATED", "Session expired or revoked"));
+        return;
+      }
+    }
+
+    const assignedRole = user.assignedRole as any;
+    const rolePermissions = assignedRole?.permissions?.map((p: any) => p.name) || [];
+    const customPermissions = (user.customPermissions as any)?.map((p: any) => p.name) || [];
+    
+    // Merge unique permissions
+    const permissions = Array.from(new Set([...rolePermissions, ...customPermissions]));
 
     req.user = {
       id: String(user._id),
@@ -44,6 +68,8 @@ export async function requireAuth(
       isPhoneVerified: Boolean(user.isPhoneVerified),
       verificationLevel: (user.verificationLevel as any) || "basic",
       verificationStatus: (user.verificationStatus as any) || "unverified",
+      permissions,
+      sessionVersion: user.sessionVersion,
     };
 
     next();
@@ -78,6 +104,28 @@ export function requireVerificationLevel(levels: VerificationLevel[]) {
       next(new ApiError(403, "FORBIDDEN", "Insufficient verification level"));
       return;
     }
+    next();
+  };
+}
+
+export function requirePermission(permissions: string | string[]) {
+  return (req: CustomReq, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      next(new ApiError(401, "UNAUTHENTICATED", "Authentication required"));
+      return;
+    }
+    
+    const requiredPerms = Array.isArray(permissions) ? permissions : [permissions];
+    const userPerms = req.user.permissions || [];
+    
+    // Check if user has ALL required permissions
+    const hasPermission = requiredPerms.every((perm) => userPerms.includes(perm));
+    
+    if (!hasPermission) {
+      next(new ApiError(403, "FORBIDDEN", "Insufficient permissions"));
+      return;
+    }
+    
     next();
   };
 }

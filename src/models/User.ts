@@ -18,6 +18,15 @@ const userSchema = new Schema(
     verificationLevel: { type: String, required: true, enum: ["basic", "individual", "business"], default: "basic" },
     verificationStatus: { type: String, required: true, enum: ["unverified", "pending", "verified", "rejected"], default: "unverified" },
     status: { type: String, required: true, enum: ["active", "suspended"], default: "active", index: true },
+    
+    // RBAC and Security
+    assignedRole: { type: Schema.Types.ObjectId, ref: "Role", required: false, default: null },
+    customPermissions: [{ type: Schema.Types.ObjectId, ref: "Permission" }],
+    mfaEnabled: { type: Boolean, required: true, default: false },
+    mfaSecret: { type: String, required: false, default: null },
+    sessionVersion: { type: Number, required: true, default: 0 },
+    lastLoginIp: { type: String, required: false, default: null },
+
     // Fields for Mechanics / Experts
     city: { type: String, required: false, default: null },
     country: { type: String, required: false, default: null },
