@@ -5,7 +5,7 @@ import { User } from "../models/User";
 import { Product } from "../models/Product";
 import type { CustomReq } from "../types/auth";
 import { sendSuccess, sendError } from "../utils/apiResponse";
-import { sendEmail } from "../services/emailService";
+import { NotificationService } from "../services/NotificationService";
 
 // ─── Customer: Send a message to a vendor ─────────────────────────────────────
 export async function createVendorMessage(req: CustomReq, res: Response) {
@@ -53,31 +53,16 @@ export async function createVendorMessage(req: CustomReq, res: Response) {
       message: message.trim(),
     });
 
-    // Send email notification to vendor
-    if (vendor.email) {
-      const productLine = productName ? `<p><strong>Regarding:</strong> ${productName}</p>` : "";
-      const emailHtml = `
-        <h2>New Message from ${senderName}</h2>
-        <p>You have received a new message on your GreenRev vendor profile.</p>
-        ${productLine}
-        <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>Message:</strong></p>
-          <p>${message.trim()}</p>
-        </div>
-        <p><strong>Contact Details:</strong></p>
-        <ul>
-          <li>Name: ${senderName}</li>
-          <li>Email: ${senderEmail}</li>
-          ${senderPhone ? `<li>Phone: ${senderPhone}</li>` : ""}
-        </ul>
-        <p>Log in to your vendor dashboard to respond or manage your messages.</p>
-      `;
-
-      await sendEmail({
-        to: vendor.email as string,
-        subject: `New Message from ${senderName} - GreenRev`,
-        html: emailHtml,
-      }).catch((err) => console.error("Failed to send vendor message email:", err));
+    // Dispatch real-time notification, DB record, and Email to vendor
+    if (vendor._id) {
+      const productText = productName ? `\nRegarding: ${productName}` : "";
+      await NotificationService.dispatchNotification({
+        recipientId: vendor._id.toString(),
+        title: `New Message from ${senderName}`,
+        message: `${message.trim()}${productText}\n\nSender Email: ${senderEmail}`,
+        type: "message",
+        relatedId: vendorMessage._id.toString(),
+      });
     }
 
     return sendSuccess(res, 201, { message: vendorMessage });

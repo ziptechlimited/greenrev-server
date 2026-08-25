@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { Message } from "../models/Message";
 import { AcquisitionRequest } from "../models/AcquisitionRequest";
 import type { CustomReq } from "../types/auth";
+import { NotificationService } from "../services/NotificationService";
 
 export async function getMessages(req: CustomReq, res: Response) {
   try {
@@ -65,6 +66,18 @@ export async function sendMessage(req: CustomReq, res: Response) {
       senderId: userId as any,
       senderName,
       text: text.trim(),
+    });
+
+    // Notify the other party
+    const recipientId = acquisition.customerId.toString() === userId ? acquisition.vendorId.toString() : acquisition.customerId.toString();
+    const recipientRole = acquisition.customerId.toString() === userId ? "Vendor" : "Customer";
+    
+    await NotificationService.dispatchNotification({
+      recipientId,
+      title: `New Message from ${senderName}`,
+      message: text.trim(),
+      type: "message",
+      relatedId: newMessage._id.toString(),
     });
 
     return res.status(201).json({ success: true, data: newMessage });
