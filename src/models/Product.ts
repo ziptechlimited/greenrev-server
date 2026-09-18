@@ -12,6 +12,8 @@ const productSpecsSchema = new Schema(
     charging: { type: String },
     compatibility: { type: String },
     warranty: { type: String },
+    origin: { type: String },
+    vin: { type: String },
   },
   { _id: false },
 );
