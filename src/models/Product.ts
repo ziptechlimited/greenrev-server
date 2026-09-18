@@ -15,7 +15,7 @@ const productSpecsSchema = new Schema(
     origin: { type: String },
     vin: { type: String },
   },
-  { _id: false },
+  { _id: false, strict: false },
 );
 
 const productColorSchema = new Schema(
