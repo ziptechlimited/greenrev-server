@@ -20,16 +20,13 @@ export async function listUsers(req: CustomReq, res: Response) {
     matchStage.role = role;
   }
 
-  const { users, total } = await User.aggregate([
-    { $match: matchStage },
-    { $facet: {
-      users: [{ $skip: skip }, { $limit: limit }],
-      total: [{ $count: "count" }]
-    }}
-  ]).then(res => ({
-    users: res[0].users,
-    total: res[0].total[0]?.count || 0
-  }));
+  const users = await User.find(matchStage)
+    .skip(skip)
+    .limit(limit)
+    .populate("assignedRole", "name description level")
+    .exec();
+
+  const total = await User.countDocuments(matchStage);
 
   return sendSuccess(res, 200, { users, total, page, limit });
 }
